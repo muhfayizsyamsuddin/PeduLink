@@ -46,4 +46,32 @@ class XenditService
 
         return $response->json();
     }
+
+    /**
+     * Retrieve an existing Xendit invoice.
+     *
+     * @return array<string, mixed>
+     */
+    public function getInvoice(string $invoiceId): array
+    {
+        $secretKey = config('services.xendit.secret_key');
+
+        if (empty($secretKey)) {
+            throw new \RuntimeException(
+                'Xendit secret key is not configured.'
+            );
+        }
+
+        $response = Http::withBasicAuth($secretKey, '')
+            ->acceptJson()
+            ->timeout(20)
+            ->get(
+                'https://api.xendit.co/v2/invoices/'
+                . rawurlencode($invoiceId)
+            );
+
+        $response->throw();
+
+        return $response->json();
+    }
 }

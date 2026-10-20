@@ -9,6 +9,7 @@ use App\Services\XenditService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Illuminate\Support\Carbon;
 use RuntimeException;
 use Throwable;
 
@@ -115,5 +116,142 @@ class DonationController extends Controller
                 'payment_url' => $donation->xendit_invoice_url,
             ],
         ], 201);
+    }
+
+    /**
+ * Display donation transactions.
+ */
+public function index(): JsonResponse
+{
+    $donations = Donation::query()
+        ->with([
+            'campaign:id,title',
+            'donor:id,name',
+        ])
+        ->latest()
+        ->paginate(15);
+
+    return response()->json([
+        'status' => 'success',
+        'message' => 'Donations retrieved successfully.',
+        'data' => $donations,
+    ]);
+}
+
+    /**
+     * Display a single donation transaction.
+     */
+    public function show(Donation $donation): JsonResponse
+    {
+        $donation->load([
+            'campaign:id,title',
+            'donor:id,name',
+        ]);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Donation retrieved successfully.',
+            'data' => [
+                'id' => $donation->id,
+                'campaign' => $donation->campaign,
+                'donor' => $donation->donor,
+                'amount' => $donation->amount,
+                'currency' => $donation->currency,
+                'message' => $donation->message,
+                'is_anonymous' => $donation->is_anonymous,
+                'status' => $donation->status,
+                'external_id' => $donation->external_id,
+                'xendit_invoice_id' => $donation->xendit_invoice_id,
+                'xendit_invoice_url' => $donation->xendit_invoice_url,
+                'paid_at' => $donation->paid_at,
+                'created_at' => $donation->created_at,
+            ],
+        ]);
+    }
+
+    /**
+     * Synchronize donation status with Xendit.
+     */
+    public function syncStatus(
+        Donation $donation,
+        XenditService $xenditService
+    ): JsonResponse {
+        if (blank($donation->xendit_invoice_id)) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'This donation has no Xendit invoice.',
+            ], 422);
+        }
+
+        try {
+            $invoice = $xenditService->getInvoice(
+                $donation->xendit_invoice_id
+            );
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unable to retrieve invoice status from Xendit.',
+            ], 502);
+        }
+
+        // Verify that the invoice belongs to this donation.
+        $identityMatches =
+            ($invoice['id'] ?? null) === $donation->xendit_invoice_id
+            && ($invoice['external_id'] ?? null) === $donation->external_id
+            && (int) ($invoice['amount'] ?? 0) === (int) $donation->amount;
+
+        $invoiceCurrency = strtoupper(
+            (string) ($invoice['currency'] ?? '')
+        );
+
+        $currencyMatches = $invoiceCurrency === ''
+            || $invoiceCurrency === strtoupper($donation->currency);
+
+        if (! $identityMatches || ! $currencyMatches) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Invoice details do not match this donation.',
+            ], 409);
+        }
+
+        $xenditStatus = strtoupper(
+            (string) ($invoice['status'] ?? '')
+        );
+
+        if (in_array($xenditStatus, ['PAID', 'SETTLED'], true)) {
+            // Never downgrade or rewrite a previously paid donation.
+            if ($donation->status !== 'paid') {
+                $paidAt = filled($invoice['paid_at'] ?? null)
+                    ? Carbon::parse($invoice['paid_at'])
+                    : now();
+
+                $donation->update([
+                    'status' => 'paid',
+                    'paid_at' => $paidAt,
+                ]);
+            }
+        } elseif (
+            $xenditStatus === 'EXPIRED'
+            && $donation->status === 'pending'
+        ) {
+            $donation->update([
+                'status' => 'expired',
+            ]);
+        }
+
+        $donation->refresh();
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Donation status synchronized.',
+            'data' => [
+                'donation_id' => $donation->id,
+                'xendit_status' => $xenditStatus,
+                'donation_status' => $donation->status,
+                'paid_at' => $donation->paid_at,
+            ],
+        ]);
     }
 }
