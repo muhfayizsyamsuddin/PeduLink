@@ -15,8 +15,16 @@ class CampaignController extends Controller
      */
     public function index(): JsonResponse
     {
+        $paidDonations = fn ($query) => $query->where('status', 'paid');
+
         $campaigns = Campaign::query()
             ->where('status', 'active')
+            ->withSum([
+                'donations as total_donated' => $paidDonations,
+            ], 'amount')
+            ->withCount([
+                'donations as paid_donations_count' => $paidDonations,
+            ])
             ->latest()
             ->get();
 
@@ -65,7 +73,20 @@ class CampaignController extends Controller
      */
     public function show(Campaign $campaign): JsonResponse
     {
-        if ($campaign->status !== 'active') {
+        $campaignData = Campaign::query()
+            ->whereKey($campaign->id)
+            ->where('status', 'active')
+            ->withSum([
+                'donations as total_donated' => fn ($query) =>
+                    $query->where('status', 'paid'),
+            ], 'amount')
+            ->withCount([
+                'donations as paid_donations_count' => fn ($query) =>
+                    $query->where('status', 'paid'),
+            ])
+            ->first();
+
+        if (! $campaignData) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Campaign not found.',
@@ -75,7 +96,7 @@ class CampaignController extends Controller
         return response()->json([
             'status' => 'success',
             'message' => 'Campaign retrieved successfully.',
-            'data' => $campaign,
+            'data' => $campaignData,
         ]);
     }
 

@@ -395,7 +395,16 @@
                     return;
                 }
 
-                campaignList.innerHTML = campaigns.map((campaign, index) => `
+                campaignList.innerHTML = campaigns.map((campaign, index) => {
+                    const targetAmount = Number(campaign.target_amount) || 0;
+                    const totalDonated = Number(campaign.total_donated) || 0;
+                    const paidDonationCount = Number(campaign.paid_donations_count) || 0;
+
+                    const progress = targetAmount > 0
+                        ? Math.min(100, Math.round((totalDonated / targetAmount) * 100))
+                        : 0;
+
+                    return `
                     <article class="group overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-slate-900/5">
                         <div class="relative flex h-44 items-end overflow-hidden bg-gradient-to-br from-emerald-900 via-emerald-800 to-teal-700 p-6">
                             <div class="absolute -right-8 -top-12 h-48 w-48 rounded-full border border-white/15"></div>
@@ -418,12 +427,39 @@
                             </p>
 
                             <div class="mt-6 border-t border-slate-100 pt-5">
-                                <p class="text-xs font-medium uppercase tracking-wider text-slate-500">
-                                    Target penggalangan dana
-                                </p>
-                                <p class="mt-1 text-lg font-bold text-emerald-800">
-                                    ${formatRupiah(campaign.target_amount)}
-                                </p>
+                                <div class="flex items-end justify-between gap-4">
+                                    <div>
+                                        <p class="text-xs font-medium uppercase tracking-wider text-slate-500">
+                                            Dana terkumpul
+                                        </p>
+                                        <p class="mt-1 text-lg font-bold text-emerald-800">
+                                            ${formatRupiah(totalDonated)}
+                                        </p>
+                                    </div>
+
+                                    <span class="rounded-full bg-emerald-50 px-3 py-1 text-sm font-bold text-emerald-800">
+                                        ${progress}%
+                                    </span>
+                                </div>
+
+                                <div
+                                    class="mt-3 h-2.5 overflow-hidden rounded-full bg-slate-100"
+                                    role="progressbar"
+                                    aria-label="Progres dana terkumpul"
+                                    aria-valuenow="${progress}"
+                                    aria-valuemin="0"
+                                    aria-valuemax="100"
+                                >
+                                    <div
+                                        class="h-full rounded-full bg-emerald-700 transition-all"
+                                        style="width: ${progress}%"
+                                    ></div>
+                                </div>
+
+                                <div class="mt-2 flex items-center justify-between gap-3 text-xs text-slate-500">
+                                    <span>Target: ${formatRupiah(targetAmount)}</span>
+                                    <span>${paidDonationCount} donasi lunas</span>
+                                </div>
                             </div>
 
                             <a
@@ -435,7 +471,8 @@
                             </a>
                         </div>
                     </article>
-                `).join('');
+                `;
+                }).join('');
             } catch (error) {
                 campaignCount.textContent = 'Kampanye tidak tersedia';
 

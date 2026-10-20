@@ -75,6 +75,44 @@
                        class="mt-5 whitespace-pre-line text-base leading-8 text-slate-600">
                     </p>
 
+                    <div class="mt-8 rounded-2xl border border-slate-200 bg-[#fafbf8] p-6">
+                        <div class="flex items-center justify-between gap-4">
+                            <p class="text-sm font-semibold text-slate-500">
+                                Dana terkumpul
+                            </p>
+                            <span
+                                id="campaign-progress-percent"
+                                class="rounded-full bg-emerald-50 px-3 py-1 text-sm font-bold text-emerald-800"
+                            >0%</span>
+                        </div>
+
+                        <p
+                            id="campaign-total-donated"
+                            class="mt-2 text-2xl font-bold text-emerald-800"
+                        >Rp0</p>
+
+                        <div
+                            id="campaign-progress-track"
+                            class="mt-4 h-3 overflow-hidden rounded-full bg-slate-200"
+                            role="progressbar"
+                            aria-label="Progres dana terkumpul"
+                            aria-valuenow="0"
+                            aria-valuemin="0"
+                            aria-valuemax="100"
+                        >
+                            <div
+                                id="campaign-progress-bar"
+                                class="h-full rounded-full bg-emerald-700 transition-all duration-500"
+                                style="width: 0%"
+                            ></div>
+                        </div>
+
+                        <div class="mt-3 flex items-center justify-between gap-3 text-sm text-slate-500">
+                            <span>Target: <strong id="campaign-progress-target">Rp0</strong></span>
+                            <span id="campaign-paid-count">0 donasi lunas</span>
+                        </div>
+                    </div>
+
                     <div class="mt-10 border-t border-slate-100 pt-6">
                         <h2 class="text-lg font-bold text-slate-900">
                             Informasi Kampanye
@@ -341,6 +379,32 @@
 
                 document.getElementById('campaign-status').textContent =
                     campaign.status === 'active' ? 'Aktif' : 'Tidak aktif';
+                
+                const targetAmount = Number(campaign.target_amount) || 0;
+                const totalDonated = Number(campaign.total_donated) || 0;
+                const paidDonationCount = Number(campaign.paid_donations_count) || 0;
+
+                const progress = targetAmount > 0
+                    ? Math.min(100, Math.round((totalDonated / targetAmount) * 100))
+                    : 0;
+
+                document.getElementById('campaign-total-donated').textContent =
+                    formatRupiah(totalDonated);
+
+                document.getElementById('campaign-progress-target').textContent =
+                    formatRupiah(targetAmount);
+
+                document.getElementById('campaign-progress-percent').textContent =
+                    `${progress}%`;
+
+                document.getElementById('campaign-progress-bar').style.width =
+                    `${progress}%`;
+
+                document.getElementById('campaign-progress-track')
+                    .setAttribute('aria-valuenow', String(progress));
+
+                document.getElementById('campaign-paid-count').textContent =
+                    `${paidDonationCount} donasi lunas`;
 
                 document.getElementById('donation-campaign-name').textContent =
                     campaign.title ?? '';
