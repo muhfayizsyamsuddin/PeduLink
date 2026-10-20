@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Campaign;
 use App\Models\Donation;
+use App\Models\Donor;
 use App\Services\XenditService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -18,6 +19,9 @@ class DonationController extends Controller
     /**
      * Create a donation and generate a Xendit invoice.
      */
+    /**
+     * Create a donation and generate a Xendit invoice.
+     */
     public function store(
         Request $request,
         XenditService $xenditService
@@ -28,14 +32,35 @@ class DonationController extends Controller
                 'integer',
                 'exists:campaigns,id',
             ],
-            'donor_id' => [
+            'donor_name' => [
+                'required',
+                'string',
+                'max:100',
+            ],
+            'donor_email' => [
+                'nullable',
+                'email',
+                'max:255',
+            ],
+            'donor_phone' => [
+                'nullable',
+                'string',
+                'max:20',
+            ],
+            'amount' => [
                 'required',
                 'integer',
-                'exists:donors,id',
+                'min:1',
             ],
-            'amount' => ['required', 'integer', 'min:1'],
-            'message' => ['nullable', 'string', 'max:2000'],
-            'is_anonymous' => ['sometimes', 'boolean'],
+            'message' => [
+                'nullable',
+                'string',
+                'max:2000',
+            ],
+            'is_anonymous' => [
+                'sometimes',
+                'boolean',
+            ],
         ]);
 
         $campaign = Campaign::findOrFail(
@@ -49,7 +74,6 @@ class DonationController extends Controller
             ], 422);
         }
 
-        // Do not create a transaction if Xendit is not configured.
         if (blank(config('services.xendit.secret_key'))) {
             return response()->json([
                 'status' => 'error',
@@ -57,9 +81,16 @@ class DonationController extends Controller
             ], 503);
         }
 
+        // Support both existing donor IDs and new public donor details.
+        $donor = Donor::create([
+            'name' => $validated['donor_name'],
+            'email' => $validated['donor_email'] ?? null,
+            'phone' => $validated['donor_phone'] ?? null,
+        ]);
+
         $donation = Donation::create([
-            'campaign_id' => $validated['campaign_id'],
-            'donor_id' => $validated['donor_id'],
+            'campaign_id' => $campaign->id,
+            'donor_id' => $donor->id,
             'amount' => $validated['amount'],
             'currency' => 'IDR',
             'message' => $validated['message'] ?? null,
@@ -119,24 +150,24 @@ class DonationController extends Controller
     }
 
     /**
- * Display donation transactions.
- */
-public function index(): JsonResponse
-{
-    $donations = Donation::query()
-        ->with([
-            'campaign:id,title',
-            'donor:id,name',
-        ])
-        ->latest()
-        ->paginate(15);
+     * Display donation transactions.
+     */
+    public function index(): JsonResponse
+    {
+        $donations = Donation::query()
+            ->with([
+                'campaign:id,title',
+                'donor:id,name',
+            ])
+            ->latest()
+            ->paginate(15);
 
-    return response()->json([
-        'status' => 'success',
-        'message' => 'Donations retrieved successfully.',
-        'data' => $donations,
-    ]);
-}
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Donations retrieved successfully.',
+            'data' => $donations,
+        ]);
+    }
 
     /**
      * Display a single donation transaction.

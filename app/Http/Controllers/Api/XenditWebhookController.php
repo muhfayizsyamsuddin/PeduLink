@@ -68,6 +68,34 @@ class XenditWebhookController extends Controller
             ], 200);
         }
 
+        $payloadAmount = $request->input('amount');
+        $payloadCurrency = $request->input('currency');
+
+        $amountMatches = is_numeric($payloadAmount)
+            && (float) $payloadAmount === (float) $donation->amount;
+
+        $currencyMatches = is_string($payloadCurrency)
+            && strtoupper(trim($payloadCurrency))
+                === strtoupper($donation->currency);
+
+        if (! $amountMatches || ! $currencyMatches) {
+            Log::warning(
+                'Verified Xendit webhook invoice details did not match donation.',
+                [
+                    'donation_id' => $donation->id,
+                    'invoice_id' => $invoiceId,
+                    'external_id' => $externalId,
+                    'received_amount' => $payloadAmount,
+                    'received_currency' => $payloadCurrency,
+                ]
+            );
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Webhook acknowledged; invoice details did not match donation.',
+            ]);
+        }
+
         $invoiceStatus = strtoupper(
             (string) $request->input('status')
         );

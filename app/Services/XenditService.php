@@ -31,6 +31,14 @@ class XenditService
             'currency' => $donation->currency,
             'description' => 'Donation: ' . $donation->campaign->title,
             'invoice_duration' => 86400,
+
+            'success_redirect_url' => route('donations.result', [
+                'externalId' => $donation->external_id,
+            ]),
+
+            'failure_redirect_url' => route('donations.result', [
+                'externalId' => $donation->external_id,
+            ]),
         ];
 
         if (! empty($donation->donor->email)) {

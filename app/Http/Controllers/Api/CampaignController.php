@@ -16,6 +16,7 @@ class CampaignController extends Controller
     public function index(): JsonResponse
     {
         $campaigns = Campaign::query()
+            ->where('status', 'active')
             ->latest()
             ->get();
 
@@ -64,6 +65,13 @@ class CampaignController extends Controller
      */
     public function show(Campaign $campaign): JsonResponse
     {
+        if ($campaign->status !== 'active') {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Campaign not found.',
+            ], 404);
+        }
+
         return response()->json([
             'status' => 'success',
             'message' => 'Campaign retrieved successfully.',
