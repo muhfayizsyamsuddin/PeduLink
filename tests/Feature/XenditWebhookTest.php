@@ -223,4 +223,48 @@ class XenditWebhookTest extends TestCase
         $this->assertSame('pending', $donation->status);
         $this->assertNull($donation->paid_at);
     }
+
+    public function test_paid_webhook_with_wrong_invoice_id_does_not_update_donation(): void
+    {
+        $donation = $this->createDonation();
+
+        $this->withHeader('x-callback-token', 'test-callback-token')
+            ->postJson('/api/webhooks/xendit/invoice', [
+                'id' => 'wrong-invoice-id',
+                'external_id' => $donation->external_id,
+                'status' => 'PAID',
+                'amount' => $donation->amount,
+                'currency' => 'IDR',
+            ])
+            ->assertOk()
+            ->assertJsonPath(
+                'message',
+                'Webhook acknowledged; no matching donation found.'
+            );
+
+        $this->assertSame('pending', $donation->fresh()->status);
+        $this->assertNull($donation->fresh()->paid_at);
+    }
+
+    public function test_paid_webhook_with_wrong_external_id_does_not_update_donation(): void
+    {
+        $donation = $this->createDonation();
+
+        $this->withHeader('x-callback-token', 'test-callback-token')
+            ->postJson('/api/webhooks/xendit/invoice', [
+                'id' => $donation->xendit_invoice_id,
+                'external_id' => 'wrong-external-id',
+                'status' => 'PAID',
+                'amount' => $donation->amount,
+                'currency' => 'IDR',
+            ])
+            ->assertOk()
+            ->assertJsonPath(
+                'message',
+                'Webhook acknowledged; no matching donation found.'
+            );
+
+        $this->assertSame('pending', $donation->fresh()->status);
+        $this->assertNull($donation->fresh()->paid_at);
+    }
 }

@@ -7,6 +7,7 @@ use App\Models\Campaign;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Auth\Access\AuthorizationException;
 
 class CampaignController extends Controller
 {
@@ -73,9 +74,17 @@ class CampaignController extends Controller
      */
     public function show(Campaign $campaign): JsonResponse
     {
+        try {
+            $this->authorize('view', $campaign);
+        } catch (AuthorizationException) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Campaign not found.',
+            ], 404);
+        }
+
         $campaignData = Campaign::query()
             ->whereKey($campaign->id)
-            ->where('status', 'active')
             ->withSum([
                 'donations as total_donated' => fn ($query) =>
                     $query->where('status', 'paid'),
@@ -85,13 +94,6 @@ class CampaignController extends Controller
                     $query->where('status', 'paid'),
             ])
             ->first();
-
-        if (! $campaignData) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Campaign not found.',
-            ], 404);
-        }
 
         return response()->json([
             'status' => 'success',
@@ -107,6 +109,7 @@ class CampaignController extends Controller
         Request $request,
         Campaign $campaign
     ): JsonResponse {
+        $this->authorize('update', $campaign);
         $validated = $request->validate([
             'title' => ['sometimes', 'required', 'string', 'max:150'],
             'slug' => [
@@ -153,6 +156,7 @@ class CampaignController extends Controller
      */
     public function destroy(Campaign $campaign): JsonResponse
     {
+        $this->authorize('delete', $campaign);
         if ($campaign->donations()->exists()) {
             return response()->json([
                 'status' => 'error',

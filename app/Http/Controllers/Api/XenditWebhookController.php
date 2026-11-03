@@ -36,21 +36,19 @@ class XenditWebhookController extends Controller
         $invoiceId = $request->input('id');
         $externalId = $request->input('external_id');
 
-        $donation = null;
+        if (! is_string($invoiceId) || blank($invoiceId) || ! is_string($externalId) || blank($externalId)) {
+            Log::warning('Xendit webhook received with invalid invoice identifiers.');
 
-        if (filled($invoiceId)) {
-            $donation = Donation::where(
-                'xendit_invoice_id',
-                $invoiceId
-            )->first();
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Webhook acknowledged; invalid invoice identifiers.',
+            ]);
         }
 
-        if (! $donation && filled($externalId)) {
-            $donation = Donation::where(
-                'external_id',
-                $externalId
-            )->first();
-        }
+        $donation = Donation::query()
+            ->where('xendit_invoice_id', $invoiceId)
+            ->where('external_id', $externalId)
+            ->first();
 
         if (! $donation) {
             Log::warning(
@@ -65,7 +63,7 @@ class XenditWebhookController extends Controller
             return response()->json([
                 'status' => 'success',
                 'message' => 'Webhook acknowledged; no matching donation found.',
-            ], 200);
+            ]);
         }
 
         $payloadAmount = $request->input('amount');

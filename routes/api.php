@@ -11,7 +11,7 @@ use App\Http\Controllers\Api\XenditWebhookController;
 
 // Authentication
 Route::post('auth/login', [AuthController::class, 'login'])
-    ->middleware('throttle:6,1');
+    ->middleware('throttle:5,1');
 
 Route::post('auth/logout', [AuthController::class, 'logout'])
     ->middleware('auth:sanctum');
